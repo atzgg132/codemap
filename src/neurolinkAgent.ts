@@ -170,14 +170,14 @@ export async function startNeurolinkChat(
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: 'you> ',
+    prompt: chalk.blue('you> '),
   });
 
   const conversationHistory: Array<{ role: string; content: string }> = [];
 
   const system = `${SYSTEM_PROMPT}\n\nYou have access to CodeMap tools via NeuroLink. Always call codemap_analyze_repo first for the target repository (${resolve(
     repoPath
-  )}), then use codemap_file_context for follow-ups. Keep answers concise.`;
+  )}), then use codemap_file_context for follow-ups. Keep answers concise and respond in clear Markdown with headings, bullets, and code blocks when useful.`;
 
   const initial = introPrompt
     ? introPrompt
@@ -210,7 +210,7 @@ export async function startNeurolinkChat(
         disableTools: false,
       });
       conversationHistory.push({ role: 'assistant', content: result.content });
-      console.log(`\n${chalk.green('assistant>')} ${result.content}\n`);
+      console.log(`\n${chalk.green('assistant>')} ${formatOutput(result.content)}\n`);
     } catch (error) {
       const { title, hint } = formatFriendlyError(error);
       console.log(`\n${chalk.red('assistant>')} ${title}`);
@@ -336,4 +336,36 @@ function printHelp(): void {
   console.log(`  ${chalk.cyan('/rerun')}  Re-run the initial analysis prompt`);
   console.log(`  ${chalk.cyan('/exit')}   Quit`);
   console.log('');
+}
+
+function formatOutput(text: string): string {
+  const lines = text.split('\n');
+  let inCode = false;
+  return lines
+    .map(line => {
+      if (line.trim().startsWith('```')) {
+        inCode = !inCode;
+        return chalk.gray(line);
+      }
+      if (inCode) return chalk.gray(line);
+
+      const heading = line.match(/^(#{1,6})\s+(.*)/);
+      if (heading) {
+        const level = heading[1].length;
+        return `${' '.repeat(Math.max(0, level - 1))}${chalk.bold(heading[2])}`;
+      }
+
+      const list = line.match(/^\s*[-*]\s+(.*)/);
+      if (list) {
+        return `${chalk.cyan('•')} ${list[1]}`;
+      }
+
+      const kv = line.match(/^([^:]+):\s*(.+)$/);
+      if (kv && kv[1].length < 40) {
+        return `${chalk.bold(kv[1])}: ${kv[2]}`;
+      }
+
+      return line;
+    })
+    .join('\n');
 }
