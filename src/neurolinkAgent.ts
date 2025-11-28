@@ -248,7 +248,7 @@ export async function startNeurolinkChat(
     try {
       await handle(trimmed);
     } catch (error) {
-      console.error('Error during chat turn:', error);
+      console.error(chalk.red('Error during chat turn:'), error);
     }
     rl.prompt();
   });
