@@ -205,6 +205,8 @@ export async function startNeurolinkChat(
         input: { text: message },
         systemPrompt: system,
         conversationHistory,
+        provider: process.env.NEUROLINK_PROVIDER || 'openai',
+        model: process.env.NEUROLINK_MODEL || 'gpt-4o-mini',
         disableTools: false,
       });
       conversationHistory.push({ role: 'assistant', content: result.content });
