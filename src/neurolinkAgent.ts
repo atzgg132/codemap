@@ -146,6 +146,26 @@ export async function startNeurolinkChat(
   repoPath: string,
   introPrompt?: string
 ): Promise<void> {
+  const providerStatus = validateProviders();
+  if (!providerStatus.ok && !process.env.NEUROLINK_ALLOW_NO_PROVIDER) {
+    console.error(
+      chalk.red(
+        `No provider credentials detected. Set one of: ${providerStatus.expected.join(
+          ', '
+        )}. To bypass (tools may fail), set NEUROLINK_ALLOW_NO_PROVIDER=1.`
+      )
+    );
+    process.exit(1);
+  } else if (providerStatus.ok) {
+    console.log(chalk.green(`Providers detected: ${providerStatus.found.join(', ')}`));
+  } else {
+    console.warn(
+      chalk.yellow(
+        'Continuing without provider validation (NEUROLINK_ALLOW_NO_PROVIDER set). Tool calls may fail.'
+      )
+    );
+  }
+
   const neurolink = await createNeurolinkAgent(repoPath);
   const rl = readline.createInterface({
     input: process.stdin,
@@ -246,6 +266,19 @@ function checkProviderCredentials(): boolean {
     'MISTRAL_API_KEY',
   ];
   return keys.some(k => !!process.env[k]);
+}
+
+function validateProviders(): { ok: boolean; found: string[]; expected: string[] } {
+  const expected = [
+    'OPENAI_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'GOOGLE_API_KEY',
+    'VERTEXAI_API_KEY',
+    'AZURE_OPENAI_API_KEY',
+    'MISTRAL_API_KEY',
+  ];
+  const found = expected.filter(k => !!process.env[k]);
+  return { ok: found.length > 0, found: found.length ? found : ['none'], expected };
 }
 
 function formatFriendlyError(error: unknown): { title: string; hint?: string } {

@@ -3,8 +3,9 @@
  * Detects architectural patterns and conventions used in the codebase
  */
 
-import { relative, dirname } from 'path';
+import { relative, dirname, basename } from 'path';
 import { DetectPatternsInput, DetectPatternsOutput, Pattern, Graph } from '../types/index.js';
+import { getInDegree, getOutDegree } from '../graph/types.js';
 
 /**
  * Pattern detector function type
@@ -286,6 +287,24 @@ const detectConfigs: PatternDetector = (files, repoRoot) => {
   };
 };
 
+const detectHotspots: PatternDetector = (_files, _repoRoot, graph) => {
+  if (!graph || graph.nodes.size === 0) return null;
+  const nodes = Array.from(graph.nodes.keys());
+  const scored = nodes.map(f => {
+    const indeg = getInDegree(graph, f);
+    const outdeg = getOutDegree(graph, f);
+    return { file: f, indeg, outdeg, total: indeg + outdeg };
+  });
+  scored.sort((a, b) => b.total - a.total);
+  const top = scored.slice(0, 3);
+  if (top.length === 0) return null;
+  return {
+    pattern: 'Graph Hotspots',
+    confidence: Math.min(1, top[0].total / Math.max(1, graph.nodes.size)),
+    evidence: top.map(t => `${basename(t.file)} (in:${t.indeg}, out:${t.outdeg})`),
+  };
+};
+
 const PATTERN_DETECTORS: PatternDetector[] = [
   detectMVC,
   detectLayeredArch,
@@ -297,6 +316,7 @@ const PATTERN_DETECTORS: PatternDetector[] = [
   detectDeadCode,
   detectTests,
   detectConfigs,
+  detectHotspots,
 ];
 
 /**
