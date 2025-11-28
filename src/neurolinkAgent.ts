@@ -349,17 +349,26 @@ function formatOutput(text: string): string {
       }
       if (inCode) return chalk.gray(line);
 
+      // Headings: bold with indentation
       const heading = line.match(/^(#{1,6})\s+(.*)/);
       if (heading) {
         const level = heading[1].length;
         return `${' '.repeat(Math.max(0, level - 1))}${chalk.bold(heading[2])}`;
       }
 
-      const list = line.match(/^\s*[-*]\s+(.*)/);
+      // Bullets: cyan dot
+      const list = line.match(/^\s*[-*•]\s+(.*)/);
       if (list) {
         return `${chalk.cyan('•')} ${list[1]}`;
       }
 
+      // Numbered list: keep number, bold label if "n." pattern
+      const num = line.match(/^\s*(\d+)\.\s+(.*)/);
+      if (num) {
+        return `${chalk.yellow(num[1] + '.')} ${num[2]}`;
+      }
+
+      // Key: value pairs
       const kv = line.match(/^([^:]+):\s*(.+)$/);
       if (kv && kv[1].length < 40) {
         return `${chalk.bold(kv[1])}: ${kv[2]}`;
