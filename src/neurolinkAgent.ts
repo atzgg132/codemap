@@ -174,6 +174,7 @@ export async function startNeurolinkChat(
   });
 
   const conversationHistory: Array<{ role: string; content: string }> = [];
+  let lastRawResponse = '';
 
   const system = `${SYSTEM_PROMPT}\n\nYou have access to CodeMap tools via NeuroLink. Always call codemap_analyze_repo first for the target repository (${resolve(
     repoPath
@@ -210,7 +211,8 @@ export async function startNeurolinkChat(
         disableTools: false,
       });
       conversationHistory.push({ role: 'assistant', content: result.content });
-      console.log(`\n${chalk.green('assistant>')} ${formatOutput(result.content)}\n`);
+      lastRawResponse = result.content;
+      console.log(`\n${chalk.green('assistant>')} ${renderWithTruncation(formatOutput(result.content), lastRawResponse)}\n`);
     } catch (error) {
       const { title, hint } = formatFriendlyError(error);
       console.log(`\n${chalk.red('assistant>')} ${title}`);
@@ -235,6 +237,15 @@ export async function startNeurolinkChat(
     }
     if (trimmed === '/help') {
       printHelp();
+      rl.prompt();
+      return;
+    }
+    if (trimmed === '/more') {
+      if (!lastRawResponse) {
+        console.log(chalk.gray('No previous response to expand.'));
+      } else {
+        console.log(`\n${chalk.green('assistant>')} ${formatOutput(lastRawResponse, { noTruncate: true })}\n`);
+      }
       rl.prompt();
       return;
     }
@@ -334,14 +345,15 @@ function printHelp(): void {
   console.log(chalk.bold('Commands:'));
   console.log(`  ${chalk.cyan('/help')}   Show this help`);
   console.log(`  ${chalk.cyan('/rerun')}  Re-run the initial analysis prompt`);
+  console.log(`  ${chalk.cyan('/more')}   Show full last response (if truncated)`);
   console.log(`  ${chalk.cyan('/exit')}   Quit`);
   console.log('');
 }
 
-function formatOutput(text: string): string {
+function formatOutput(text: string, opts?: { noTruncate?: boolean }): string {
   const lines = text.split('\n');
   let inCode = false;
-  return lines
+  const pretty = lines
     .map(line => {
       if (line.trim().startsWith('```')) {
         inCode = !inCode;
@@ -377,4 +389,20 @@ function formatOutput(text: string): string {
       return line;
     })
     .join('\n');
+
+  if (opts?.noTruncate) return pretty;
+
+  return renderWithTruncation(pretty, text);
+}
+
+function renderWithTruncation(pretty: string, raw: string): string {
+  const maxChars = 4000;
+  const maxLines = 120;
+  const lines = pretty.split('\n');
+  if (pretty.length <= maxChars && lines.length <= maxLines) return pretty;
+  const truncated = lines.slice(0, maxLines).join('\n');
+  const moreNotice = chalk.gray(
+    `\n… truncated (showing ${Math.min(lines.length, maxLines)} of ${lines.length} lines). Type /more to view all.\n`
+  );
+  return truncated + moreNotice;
 }
